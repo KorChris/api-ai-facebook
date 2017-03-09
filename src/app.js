@@ -55,7 +55,168 @@ class FacebookBot {
         }
     }
 
+    //Make data from apiai servce as Facebook message format
+    doRichContentResponse(sender, messages) {
+        let facebookMessages = []; // array with result messages
 
+        for (let messageIndex = 0; messageIndex < messages.length; messageIndex++) {
+            let message = messages[messageIndex];
+
+            switch (message.type) {
+                //message.type 0 means text message
+                case 0:
+                    // speech: ["hi"]
+                    // we have to get value from fulfillment.speech, because of here is raw speech
+                    if (message.speech) {
+
+                        let splittedText = this.splitResponse(message.speech);
+
+                        splittedText.forEach(s => {
+                            facebookMessages.push({text: s});
+                        });
+                    }
+
+                    break;
+                //message.type 1 means card message
+                case 1: {
+                    let carousel = [message];
+
+                    //If next message is also card, connect it
+                    for (messageIndex++; messageIndex < messages.length; messageIndex++) {
+                        if (messages[messageIndex].type == 1) {
+                            carousel.push(messages[messageIndex]);
+                        } else {
+                            messageIndex--;
+                            break;
+                        }
+                    }
+
+                    let facebookMessage = {};
+                    carousel.forEach((c) => {
+                        // buttons: [ {text: "hi", postback: "postback"} ], imageUrl: "", title: "", subtitle: ""
+
+                        let card = {};
+
+                        card.title = c.title;
+                        card.image_url = c.imageUrl;
+                        if (this.isDefined(c.subtitle)) {
+                            card.subtitle = c.subtitle;
+                        }
+                        //If button is involved in.
+                        if (c.buttons.length > 0) {
+                            let buttons = [];
+                            for (let buttonIndex = 0; buttonIndex < c.buttons.length; buttonIndex++) {
+                                let button = c.buttons[buttonIndex];
+
+                                if (button.text) {
+                                    let postback = button.postback;
+                                    if (!postback) {
+                                        postback = button.text;
+                                    }
+
+                                    let buttonDescription = {
+                                        title: button.text
+                                    };
+
+                                    if (postback.startsWith("http")) {
+                                        buttonDescription.type = "web_url";
+                                        buttonDescription.url = postback;
+                                    } else {
+                                        buttonDescription.type = "postback";
+                                        buttonDescription.payload = postback;
+                                    }
+
+                                    buttons.push(buttonDescription);
+                                }
+                            }
+
+                            if (buttons.length > 0) {
+                                card.buttons = buttons;
+                            }
+                        }
+
+                        if (!facebookMessage.attachment) {
+                            facebookMessage.attachment = {type: "template"};
+                        }
+
+                        if (!facebookMessage.attachment.payload) {
+                            facebookMessage.attachment.payload = {template_type: "generic", elements: []};
+                        }
+
+                        facebookMessage.attachment.payload.elements.push(card);
+                    });
+
+                    facebookMessages.push(facebookMessage);
+                }
+
+                    break;
+                //message.type 2 means quick replies message
+                case 2: {
+                    if (message.replies && message.replies.length > 0) {
+                        let facebookMessage = {};
+
+                        facebookMessage.text = message.title ? message.title : 'Choose an item';
+                        facebookMessage.quick_replies = [];
+
+                        message.replies.forEach((r) => {
+                            facebookMessage.quick_replies.push({
+                                content_type: "text",
+                                title: r,
+                                payload: r
+                            });
+                        });
+
+                        facebookMessages.push(facebookMessage);
+                    }
+                }
+
+                    break;
+                //message.type 3 means image message
+                case 3:
+
+                    if (message.imageUrl) {
+                        let facebookMessage = {};
+
+                        // "imageUrl": "http://example.com/image.jpg"
+                        facebookMessage.attachment = {type: "image"};
+                        facebookMessage.attachment.payload = {url: message.imageUrl};
+
+                        facebookMessages.push(facebookMessage);
+                    }
+
+                    break;
+                //message.type 4 means custom payload message
+                case 4:
+                    if (message.payload && message.payload.facebook) {
+                        facebookMessages.push(message.payload.facebook);
+                    }
+                    break;
+
+                default:
+                    break;
+            }
+        }
+        //use async, sending action first, get delay and then send Facebook messages
+        return new Promise((resolve, reject) => {
+            async.eachSeries(facebookMessages, (msg, callback) => {
+                    this.sendFBSenderAction(sender, "typing_on")
+                        .then(() => this.sleep(this.messagesDelay))
+                        .then(() => this.sendFBMessage(sender, msg))
+                        .then(() => callback())
+                        .catch(callback);
+                },
+                (err) => {
+                    if (err) {
+                        console.error(err);
+                        reject(err);
+                    } else {
+                        console.log('Messages sent');
+                        resolve();
+                    }
+                });
+        });
+
+    }
 
     //Dealing with having only text for message
     doTextResponse(sender, responseText) {
@@ -91,6 +252,8 @@ class FacebookBot {
 
     }
 
+
+
     processEvent(event) {
         const sender = event.sender.id.toString();
         const text = this.getEventText(event);
@@ -111,7 +274,6 @@ class FacebookBot {
                     source: "facebook"
                 }
             });
-            
             //Getting response data from apiai
             apiaiRequest.on('response', (response) => {
                 if (this.isDefined(response.result) && this.isDefined(response.result.fulfillment)) {
