@@ -443,6 +443,10 @@ app.post('/webhook/', (req, res) => {
                         if (event.message && !event.message.is_echo ||
                             event.postback && event.postback.payload) {
                             facebookBot.processEvent(event);
+                        }else if(event.payment){
+                            console.log("payment request received");
+                        }else{
+                            console.log('unknown webhook received');
                         }
                     });
                 }
