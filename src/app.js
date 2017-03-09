@@ -72,120 +72,122 @@ class FacebookBot {
                         let splittedText = this.splitResponse(message.speech);
 
                         splittedText.forEach(s => {
-                            facebookMessages.push({text: s});
+                            facebookMessages.push({ text: s });
                         });
                     }
 
                     break;
-                //message.type 1 means card message
-                case 1: {
-                    let carousel = [message];
+                    //message.type 1 means card message
+                case 1:
+                    {
+                        let carousel = [message];
 
-                    //If next message is also card, connect it
-                    for (messageIndex++; messageIndex < messages.length; messageIndex++) {
-                        if (messages[messageIndex].type == 1) {
-                            carousel.push(messages[messageIndex]);
-                        } else {
-                            messageIndex--;
-                            break;
+                        //If next message is also card, connect it
+                        for (messageIndex++; messageIndex < messages.length; messageIndex++) {
+                            if (messages[messageIndex].type == 1) {
+                                carousel.push(messages[messageIndex]);
+                            } else {
+                                messageIndex--;
+                                break;
+                            }
                         }
-                    }
 
-                    let facebookMessage = {};
-                    carousel.forEach((c) => {
-                        // buttons: [ {text: "hi", postback: "postback"} ], imageUrl: "", title: "", subtitle: ""
+                        let facebookMessage = {};
+                        carousel.forEach((c) => {
+                            // buttons: [ {text: "hi", postback: "postback"} ], imageUrl: "", title: "", subtitle: ""
 
-                        let card = {};
+                            let card = {};
 
-                        card.title = c.title;
-                        card.image_url = c.imageUrl;
-                        if (this.isDefined(c.subtitle)) {
-                            card.subtitle = c.subtitle;
-                        }
-                        //If button is involved in.
-                        if (c.buttons.length > 0) {
-                            let buttons = [];
-                            for (let buttonIndex = 0; buttonIndex < c.buttons.length; buttonIndex++) {
-                                let button = c.buttons[buttonIndex];
+                            card.title = c.title;
+                            card.image_url = c.imageUrl;
+                            if (this.isDefined(c.subtitle)) {
+                                card.subtitle = c.subtitle;
+                            }
+                            //If button is involved in.
+                            if (c.buttons.length > 0) {
+                                let buttons = [];
+                                for (let buttonIndex = 0; buttonIndex < c.buttons.length; buttonIndex++) {
+                                    let button = c.buttons[buttonIndex];
 
-                                if (button.text) {
-                                    let postback = button.postback;
-                                    if (!postback) {
-                                        postback = button.text;
+                                    if (button.text) {
+                                        let postback = button.postback;
+                                        if (!postback) {
+                                            postback = button.text;
+                                        }
+
+                                        let buttonDescription = {
+                                            title: button.text
+                                        };
+
+                                        if (postback.startsWith("http")) {
+                                            buttonDescription.type = "web_url";
+                                            buttonDescription.url = postback;
+                                        } else {
+                                            buttonDescription.type = "postback";
+                                            buttonDescription.payload = postback;
+                                        }
+
+                                        buttons.push(buttonDescription);
                                     }
+                                }
 
-                                    let buttonDescription = {
-                                        title: button.text
-                                    };
-
-                                    if (postback.startsWith("http")) {
-                                        buttonDescription.type = "web_url";
-                                        buttonDescription.url = postback;
-                                    } else {
-                                        buttonDescription.type = "postback";
-                                        buttonDescription.payload = postback;
-                                    }
-
-                                    buttons.push(buttonDescription);
+                                if (buttons.length > 0) {
+                                    card.buttons = buttons;
                                 }
                             }
 
-                            if (buttons.length > 0) {
-                                card.buttons = buttons;
+                            if (!facebookMessage.attachment) {
+                                facebookMessage.attachment = { type: "template" };
                             }
-                        }
 
-                        if (!facebookMessage.attachment) {
-                            facebookMessage.attachment = {type: "template"};
-                        }
+                            if (!facebookMessage.attachment.payload) {
+                                facebookMessage.attachment.payload = { template_type: "generic", elements: [] };
+                            }
 
-                        if (!facebookMessage.attachment.payload) {
-                            facebookMessage.attachment.payload = {template_type: "generic", elements: []};
-                        }
-
-                        facebookMessage.attachment.payload.elements.push(card);
-                    });
-
-                    facebookMessages.push(facebookMessage);
-                }
-
-                    break;
-                //message.type 2 means quick replies message
-                case 2: {
-                    if (message.replies && message.replies.length > 0) {
-                        let facebookMessage = {};
-
-                        facebookMessage.text = message.title ? message.title : 'Choose an item';
-                        facebookMessage.quick_replies = [];
-
-                        message.replies.forEach((r) => {
-                            facebookMessage.quick_replies.push({
-                                content_type: "text",
-                                title: r,
-                                payload: r
-                            });
+                            facebookMessage.attachment.payload.elements.push(card);
                         });
 
                         facebookMessages.push(facebookMessage);
                     }
-                }
 
                     break;
-                //message.type 3 means image message
+                    //message.type 2 means quick replies message
+                case 2:
+                    {
+                        if (message.replies && message.replies.length > 0) {
+                            let facebookMessage = {};
+
+                            facebookMessage.text = message.title ? message.title : 'Choose an item';
+                            facebookMessage.quick_replies = [];
+
+                            message.replies.forEach((r) => {
+                                facebookMessage.quick_replies.push({
+                                    content_type: "text",
+                                    title: r,
+                                    payload: r
+                                });
+                            });
+
+                            facebookMessages.push(facebookMessage);
+                        }
+                    }
+
+                    break;
+                    //message.type 3 means image message
                 case 3:
 
                     if (message.imageUrl) {
                         let facebookMessage = {};
 
                         // "imageUrl": "http://example.com/image.jpg"
-                        facebookMessage.attachment = {type: "image"};
-                        facebookMessage.attachment.payload = {url: message.imageUrl};
+                        facebookMessage.attachment = { type: "image" };
+                        facebookMessage.attachment.payload = { url: message.imageUrl };
 
                         facebookMessages.push(facebookMessage);
                     }
 
                     break;
-                //message.type 4 means custom payload message
+                    //message.type 4 means custom payload message
                 case 4:
                     if (message.payload && message.payload.facebook) {
                         facebookMessages.push(message.payload.facebook);
@@ -251,8 +253,6 @@ class FacebookBot {
         return null;
 
     }
-
-
 
     processEvent(event) {
         const sender = event.sender.id.toString();
@@ -417,7 +417,6 @@ class FacebookBot {
     }
 
 }
-
 
 let facebookBot = new FacebookBot();
 
