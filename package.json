@@ -9,7 +9,10 @@
     "coverage": "istanbul cover _mocha"
   },
   "author": "Danil Skachkov <danil.skachkov@speaktoit.com> (https://api.ai)",
-  "license": "ISC",
+  "licenses": [{
+    "type": "Apache-2.0",
+    "url": "http://www.apache.org/licenses/LICENSE-2.0"
+  }],
   "dependencies": {
     "apiai": "^3.0.3",
     "async": "^2.0.0",
